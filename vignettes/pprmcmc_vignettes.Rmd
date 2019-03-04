@@ -1,0 +1,355 @@
+---
+title: "Getting started with PPR package **pprmcmc** "
+author: |
+    | Hola Adrakey 
+    | Heriot-Watt University
+date: "`r Sys.Date()`"  
+header-includes:
+   - \usepackage{framed}
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+number_sections: TRUE
+fig_caption: yes
+keep_tex: yes
+graphics: yes
+bibliography: C:/Users/hola/Dropbox/Draft/Thesis_Template/references.bib
+---
+
+```{r, echo=FALSE, warning=F}
+library(knitr)
+if (identical(knitr:::pandoc_to(), 'latex')) knit_hooks$set(plot = hook_plot_tex)
+
+```
+
+# 1 Introduction
+The problem of analysis of a network diffusion in general is challenging, given that the transmission network is often hidden. This complexity is exacerbated for livestock diseases such as Pest des Petits Ruminants (PPR) since the locations of the nodes are not known in advance.  The location may only become known when a node is infected [@EFSA15]. Techniques relevant to modelling PPR spread within a country should therefore be capable of handling the problem of unobserved susceptible populations when estimating system parameters.  There is a large body of literature that uses machine-learning methods for estimating the transmission networks e.g [@EPL09; @KSAX10;@LOSI10;@MYLE10; @GRLEKR10; @GRBASC11; @DSWZ13]. These approaches to estimation of transmission networks consider only the temporal dynamic and do not take account of spatial aspects. Therefore, to capture within-country spread we have opted to adapt explicitly spatio-temporal models exemplified by Paper citep{CMBG07}, and [@CGC08; @SSF09 @Par09; @DCMGB11; @CLNDG14; @PGPG14; @CSDGG15] utilising modern Bayesian computational techniques in developing bespoke fitting algorithms. These are illustrated using the data from Tunisia. 
+
+**pprmcmc** performs the popular Markov Chain Monte Carlo (MCMC) coupled with the Bayesian data augmentation techinques by considering the missing transmission network as addional parameters. In addition to generating the joint posterior distribution of the model parameters and the transmission network, it provides users with a simple way to generate simulate replicates of the model process and to estimate the wave speed of propagation.
+
+# 2 What **pprmcmc** does
+MCMC and Bayesian data augmentation in this context involves imputing, at each iteration of the MCMC, a transimission network so that the likelihood becomes tractable. The model parameters are then drawn considering their full conditional distributions. **pprmcmc** then provides samples of the model parameters and the transmission network which are treated as their posterior distributions. Under normal circumstances, you only need to provide some initials parameters including the models parameters and the transimission network and can then use the posterior distribution for estimating the wave speed of propagation. The posterior distribution of the wave speed is the provided by **pprmcmc** by simpling providing the distribution of the model parameters.
+
+The advantage of **pprmcmc** is that it combines the comparative speed and ease-of-use of our algorithm with the power of transmission network imputation.
+
+## Assumptions 
+We represent the spread of PPR through a landscape using a model that can be fitted to data where only infections are recorded.
+
+The main assumptions are as follows:
+
+1. An infection premises remain infectious for fixed period, $\gamma$
+
+2. Premises cause new infections according to Poisson process with fixed rate $\beta$ and the new infection is located at random distance $r\sim f(r;\alpha)$ from the source.
+
+3. The unknown susceptible population is implicitly modelled in this approach as a spatial Poisson process.
+
+We note that the representation of the susceptible population means that the effect of depletion of the susceptible population is not explicitly represented in the population.  However, the approach is valid for the linear phase of the epidemic and, arguably, is appropriate for the estimation of speeds of the disease ‘wave-front'.
+
+For a given choice of distribution f, there are 3 key parameters in this model – the contact rate $\beta$, the infectious period $\gamma$ and the parameter $\alpha$ which controls the spatial dispersal process.  All of these play a role in the estimation of rates of spatial spread.   We have proposed a number of candidate models: 
+\begin{align}\label{kernel}
+\textbf{Rayleigh($\alpha$), i.e} \qquad f(r;\alpha)=&2r\alpha\exp\left(-\alpha r^2\right)\nonumber\\
+\textbf{Exponential($\alpha$), i.e }\qquad f(r;\alpha)=&\alpha\exp\left(-\alpha r\right)\\
+\textbf{Cauchy($\alpha$), i.e                   }\qquad  f(r;\alpha)=&\frac{2}{\pi \alpha\left(1+\frac{r^2}{\alpha^2}\right)}
+\end{align}
+
+in which $r$ is the Euclidean distance between a given pair of premises and measured in $km$. Note that these one dimensional kernels are isotropic defined on the positive real axis. These models represent scenarios in which the propensity for long range interactions increases – with the Cauchy model exhibiting ‘jumps’ in the infection process that are very long-range. The kernels defined above ensure that different pattern of the epidemic could be compared directly. While thin-tailed such as Rayleigh and exponential kernels give rise to slow spreading wave of new infections, the thick-tailed kernels such as Cauchy result in a rapid and long dispersal ahead of the source [@MOL77; @CSKM99]. Techniques developed here can readily be adapted to other models in addition to the three variants considered above.
+
+Analyses under **pprmcmc** were carried out assuming that the infectious period $\gamma$ was known, but this assumption is relaxed in the present pacakage where $\gamma$ is inferred.
+
+
+## Inference methods
+
+### Bayesian imputation of the network
+
+In the Bayesian approach, a prior distribution $\pi(\alpha,\beta,\gamma)$ is placed on the unknown parameters. The likelihood function $\pi(y|\alpha,\beta,\gamma)$ is not easy to compute due to the fact that the network of infections (‘who infected whom’) – denoted $s$ here – is not observed.  However, using the data-augmented approach we can overcome this problem by treating the infectious network as an additional unknown ‘parameter’ and investigating the joint posterior $\pi(\alpha,\beta,\gamma,s|y)$  Markov chain Monte Carlo (MCMC) methods are well suited to solving such problems.  These operate by first formulating a Markov chain whose state space in the set of all possible $(\alpha,\beta,\gamma,s)$ and whose stationary distribution is $\pi(\alpha,\beta,\gamma,s|y)$.  By simulating the chain, we can explore this latter distribution and make inference on $\alpha,\beta,\gamma \text{ and }s$ by considering the marginal distribution of these quantities.  
+
+The approach is generally seen as the ‘gold standard’ for problems of this kind. For small systems, such as that considered here, the algorithms developed tend to be very efficient computationally but we note that that related algorithms can be applied to much larger systems and the approach extends to large data sets involving thousands of infections.
+
+#### Markov chain Monte Carlo Algorithm
+
+The key parameters of the process $\alpha,\beta,\gamma)$  are estimated in Bayesian framework using MCMC coupled with data augmentation methods. Let $[0, T]$ denotes the observation period and let $t_i$ denotes the infection time of the premises $i$.  We denote by $y = (t_1,\ldots,t_N)$ the ordered infection, where $t_1 = 0$ without loss of generality.  The network of transmissions is specified by the set of sources for each infection occurring after the first infection and this is denoted by $s = (s_2,\ldots, s_N)$, where $s_i$ denotes the source of the infection occurring at time $t_i$. If the transmission network (the set of sources) is treated as a parameter, then the likelihood is given by
+\begin{equation}\label{likeh}
+L(\alpha,\beta,\gamma,s|y)\propto \exp\left(-\beta\int_0^T n(t)dt\right)\prod_{i=2}^{N}\beta\frac{f(r_i;\alpha)}{r_i}
+\end{equation}
+where $n(t)$ is the number of infectious premises at time $t$ and $r_i$ denotes the distance between the premises infected at time $t_i$ and the source premises as specified by $s_i$. Had these sources been observed then parameters $(\alpha,\beta,\gamma)$ could be estimated using for example the maximum likelihood method. In the absence of this information we can nevertheless investigate the posterior distribution of the augmented parameter $(\alpha,\beta,\gamma,s)$ in the Bayesian framework using MCMC.  
+
+In summary, MCMC operates by sampling from a target distribution by establishing a Markov chain which has the target distribution as its stationary distribution.  For more standard statistical problems such as generalised linear modelling MCMC can usually be carried out using standard packages. However, it is typically the case that its use in the context of inference for nonlinear spatio-temporal stochastic epidemic models requires development of bespoke algorithms.
+
+To complete the Bayesian framework, we need to assign prior distributions to the transmission rate $\beta$, the dispersal parameter $\alpha$ and the infectious $\gamma$. We propose an independent vague gamma priors for parameters $\alpha\sim Gamma(a,b)$ and $\beta \sim Gamma(c,d)$, and a uniform distribution for the infectious period $\gamma \sim U[e,f]$. From Bayes's theorem, the joint posterior distribution is then given by,
+\begin{align}
+\pi (\alpha,\beta,\gamma,s|y)\propto L(\alpha,\beta,\gamma,s|y)\beta^{c-1}\alpha^{a-1}\exp(-d\beta-b\alpha),&\quad \alpha,\beta>0,\nonumber\\
+                                                                                                         &e<\gamma<f
+\end{align} 
+and can be sampled using the Markov chain. Inference on individual parameters is made by considering the marginal posterior distribution of the parameter from the simulations from the joint posterior distribution.
+
+#### Construction of the Markov chain
+
+A single iteration of the Markov chain requires making updates to each of the parameters in the augmented parameter vector. Where it is straightforward to sample directly from the posterior density of a parameter conditional on the values of all other parameters then that parameter can be updated using a Gibbs step, whereby the updated value is simply a draw from the respective conditional density.  If this cannot be effected for a given parameter, then knowledge of the posterior density up to unknown normalising constants allows Metropolis-Hastings methods to be used.
+
+##### Conditional distribution of $\beta$
+
+The full conditional distribution of the transmission rate density (given all other parameters) is given by:
+\begin{equation}\label{condbet}
+\beta|\gamma,y \sim Gamma(N+c,\int_0^T n(t)dt+d)
+\end{equation}
+\textbf{Conditional distribution of $\alpha$}
+
+The full conditional distribution of the dispersal parameter $\alpha$ depends on the particular kernel function $f$ that is chosen. 
+
+- For the Rayleigh kernel considered initially, we have
+\begin{equation}\label{condalp1}
+\alpha|s,y \sim Gamma(N+a,b+\sum_{i=2}^N r_i^2)
+\end{equation}
+- For the exponential kernel considered later, we have
+\begin{equation}\label{condalp2}
+\alpha|s,y \sim Gamma(N+a,b+\sum_{i=1}^N r_i)
+\end{equation}
+- For the Cauchy kernel, using a uniform prior in this case, we have
+\begin{equation}\label{condalp3}
+p(\alpha|s,y )\propto \prod_{i=1}^N \frac{1}{\alpha\left(1+\frac{r_i^2}{\alpha^2}\right)}
+\end{equation}
+
+
+##### Conditional distribution of the infectious period $\gamma$
+
+The full conditional distribution of the infectious period is given by
+\begin{equation}\label{condgam}
+\pi(\gamma|\beta,y)\propto \exp\left(-\beta\int_{0}^Tn(t)dt)\right)
+\end{equation}
+where the dependence on $\gamma$ on the right-hand side arises through the dependence of $n(t)$, the number of infected premises at time $t$, on the infectious period.
+
+##### Conditional distribution of the infecting sources $s$.
+
+It is possible to identify formally the conditional distribution of $s$ given the other parameters as
+\begin{equation}\label{trans}
+\pi(s^{new}|\alpha,\gamma,y)\propto \prod_{i=2}^{N}\frac{f(r_i;\alpha)}{r_i}
+\end{equation} 
+where the $r_i$ is the distance between the premises infected at time $t_i$ and the infecting source $si$.
+##### Parameter updates
+
+Using the conditionals identified above it is possible to use Gibbs steps (i.e. updating a parameter by directly drawing from its conditional distribution) to update $\beta$, and to update $\alpha$ for the case of the Rayleigh and Exponential kernels. However it is not straightforward to draw samples directly from the conditional distributions of $\alpha$ in the Cauchy kernel or of $\gamma$.
+
+For these parameters we therefore use a Metropolis update with Gaussian and Uniform proposal distribution respectively for $\alpha$ and $\beta$ respectively, centred on the current value of these parameters.  The acceptance probability for a proposed move this form is given by
+\begin{equation}
+pacc=\min\left\lbrace 1, \frac{\pi(\theta^{new})}{\pi(\theta^{old})}\right\rbrace
+\end{equation} 
+where $\pi$ here denotes the conditional density of the parameter $\theta$ being updated. 
+
+To update to transmission network an infected premises $j$ is selected at random from infections $2,\ldots, N$.  A new source $s’$ is proposed uniformly from the set of premises that are infected at time $t_j$.  Specifically, this is the set of sources with an infection time $t_i$ such that $t_i < t_j < t_i + \gamma $  The proposed source is then accepted with probability 
+\begin{equation}
+pacc=\min\left\lbrace 1, \frac{f(r^\prime,\alpha)}{f(r_j,\alpha)}\frac{r_j}{r^\prime}\right\rbrace
+\end{equation} 
+Where $r_j$ and $r’$ denote the distance between site $j$ and the current source and proposed source respectively.
+
+## Estimating wave speeds for PPR transmission
+
+In this section the estimation of wave speeds from the analyses of the previous section is described. This is essential to establish the link between the country-specific model and the network model considered in the package **minitime**, as the wave speed is related to the time taken for PPR to transit a given country and infect a neighbour. To this end, we simulate the epidemic process using the posterior distribution of the parameters obtained from the inference and measure how far the disease spreads from the initial source after some particular period. 
+The following is the algorithm (essentially a variant of the well-known Gillespie algorithm) to simulate a realisation of the epidemic, given a set of parameters ($\alpha, \beta, \gamma$) , and estimate wave speeds.  This algorithm is then repeatedly run using different parameters sets  ($\alpha, \beta, \gamma$) drawn from the posterior distribution $\pi(\alpha, \beta, \gamma|y)$ where $y$ denotes the Tunisian data.
+
+### Simulation algorithm
+
+**Speed of wave propagation simultion algorithm**
+
+1. Initialise $t=t_0$, the initial time, and set location of the initial infection to be  $X_0=(x_0,y_0)$, the number of infectious hosts $n=1$ and the initial distance measuring how far the disease spread $d_0=0$.
+2. Add new  infectious period $\gamma$ for the new infection. 
+3. New infections (or removals) are generated as follows. Suppose that at time t there have been $k$ infections and $n\geq 1$ currently infectious premises and let $\Delta_R$ denote the infimum of the remaining infectious periods for active infections at time $t$.  Draw $u \sim U(0, 1)$ and calculate 
+
+\begin{equation}
+\Delta_t=-\log(u)/(n\beta)
+\end{equation}
+4. If $\Delta t<\Delta_R$, then select a currently infected premises $j$ uniformly at random from the $n$ infections that has not removed yet, draw $\theta \sim U[0,2\pi]$, draw $r\sim f(r;\alpha)$ and place a new infection at location 
+\begin{equation}
+X_{k+1}=X_j+ (r\cos(\theta),+r\sin(\theta))
+\end{equation}
+Assign this new infection to have infectious period $\gamma$ and reduce remaining infectious periods of all other infections by $\Delta t$, setting $t = t + \Delta t$. Calculate $d_{k+1} = d(X_0, X_{k+1})$ where $d()$ denotes Euclidean distance.
+5. If $\Delta t>\Delta_R$ then remove the infection with the minimal remaining infection time and reduce all other infectious periods by $\Delta R$,   and set $t = t + \Delta_R$, then return to step 3.
+6. Repeat $2-5$ until a stopping criterion is reached (e.g $t\geq T$).
+\end{enumerate}
+\end{framed}
+For a given realisation of the process, a set of estimates of wave speed $v_1,\ldots,v_m$ can be generated at times $T_1,\ldots,T_m$,  where $v_i = D_i/T_i$ and $D_i$ is the maximum distance the wave has travelled by time $T_i$ and is given by
+\begin{equation}
+D_i=\max_k\left\lbrace d(X_0,X_k)|t_k\leq T_i\right\rbrace
+\end{equation}
+that is the largest distance between $X_0$ and any premises whose infection time is less than or equal to $T_i$.
+
+To account for the uncertainty on the model parameters, we sample from the joint posterior distribution of the model parameters.  Therefore each draw of parameters from the posterior distribution provides m estimates of the speed, which we use to build up a population of estimates of speed.
+
+### Estimating wave speeds for Tunisian data
+
+The methodology for estimating wave speeds is illustrated on the data from Tunisia – denoted $y$. Three different kernel functions were used (Rayleigh, Exponential, Cauchy) and distributions of wave speeds were estimated.  
+
+  **Algorithm**
+  
+- A total of 1000 samples from the posterior distribution $\pi(\alpha,\beta,\gamma|y)$ were generated using the MCMC algorithm \ref{algo3}.  
+
+- For each sample the process is simulated until time $T = 325$ and speeds $v_1,\ldots,v_{325}$ are estimated at times $i = 1, 2,\ldots, 325$ respectively.
+
+#3 Instructions
+
+## Installations
+The package is installable on any machine that supports R, as long as the following requirements are met:
+
+1. Installation of R or Rstudio 
+
+2. Make sure you have Rtools installed. This could be obtained from CRAN by following the link
+https://cran.r-project.org/bin/windows/Rtools/
+
+3. Make sure the R and Rtools paths are added in the environment variable.
+                                                                                                               
+4. Checks if Rtools is installed by:
+      - Installing the R package **devtools**
+      - loading the package into R (**library(devtools)**)
+      - If the command **find_rtools()** results in **TRUE**, then it should be possible to proceed.
+      
+5. Installation of the dependent R packages Rcpp, RcppArmadillo, ggplot2 and VGAM (all available on CRAN)
+
+6. The two files to be installed are **pprmcmc_0.1.0.tar.gz** and. The command line **install.packages("path_to_file/pprmcmc_0.1.0.tar.gz", repos = NULL, type = "source",dependencies=TRUE)** where path_to_file would represent the full path will install the package.
+   
+After the installation the pacakges can be loaded into R/Rstudio using *library(pprmcmc)*. The command line **??pprmcmc** and **vignette("pprmcmc_vignettes")** would provide the package help pages and its documentation respectively. The most important functions are listed in the description page and could be accessed. The list of all functions and some headers could then be accessed by clicking on **Index** seen at the bottom line of the description page.
+
+The source codes (C++ code) are included in the folder **pprmcmc** at /src, the data at /data and any R code is included in /R. Note that the only routine written in R is the speed of propagation **speed.R**.
+All the functions (C++) are contained in one file, so any modification of a function regarding the MCMC will be made in **postsamp.cpp** respectively. Note that the examples included are those used to obtain the graphs (regarding PPR) in the main report.
+
+## Modification
+The simplest approach for modifying this package would follow these steps:
+
+1. Install the most recent Rstudio
+
+2. Install the packages **devtools, roxygen2, testthat, knitr** (all available on CRAN)
+
+3. Open the file **pprmcmc.Rproj** contained in the folder **pprmcmc**. 
+
+4. Go to **Tools>Project Options>Build Tools>Configure** and check **Build & Reload**
+
+5. After making the requiered modification click **Build & Reload** in the build panel to completely rebuild the package, including updating all the documentation, installs it in your own library.
+
+@WIC15 provides more details of how to build and update such a package. 
+
+# 4 A User’s Guide
+
+## Tunisian Data and initials considerations
+We now explain how to use **pprmcmc** on the Tunisia data in @EFSA15 which consist of the times the locations of infected sites. We reflect our vague prior knowledge on the parameters $\alpha$ and $\beta$ by setting $a=c=10^{-4}$ and $ b=d=10^{-6}$ but we choose an informative prior belief for the infectious period by setting $e=0$ and $f=120$. This choice allows premises to remain infectious for a period up to four months as opposed to three months period considered in @EFSA15 since there is no evidence showing an external source of infection for the $4^{th}$ infection which occurred $108$ days after the third one. 
+
+We begin by loading the package and then attaching the PPR data from Tunisia.  Then we provide some initial values for the MCMC routine.
+```{r, message=F, warning=F,echo=TRUE}
+library("pprmcmc")
+
+data(ppr)
+attach(ppr)
+#Premisses locations
+Coo=matrix(c(ppr$Longitude,ppr$Latitude),nrow=26,ncol=2,byrow=F)
+
+#Infection times
+diff=as.Date(Date.of.start.of.the.outbreak)-as.Date(Date.of.start.of.the.outbreak)[1]
+inf=as.numeric(diff)
+inf[2:26]=inf[2:26]+runif(25)
+Inftim=sort(inf)
+
+#Initial sources
+infper=110
+rt=Inftim + infper
+Sourc=numeric(26)
+for(i in 2:26){
+a=which(Inftim[i]>Inftim)
+b=which(Inftim[i]<rt)
+l=a[a%in%b]
+Sourc[i]=sample(l,1)
+}
+Sourc=Sourc-1
+
+```
+## Sample from posterior distributions
+
+**raymcmc**, **expmcmc** and **caumcmc** provide respectively samples from the posteriors distributions using the Rayleigh, the Exponential and the Cauchy kernls. 
+
+*   **Rayleigh kernel**
+
+Considering the Rayleigh kernel and using the default values for the priors and the initial values for the model parameters, (see the package help page or simply **help(raymcmc)**), 100000 iterations using the followng command produced the results in the main report. Note that the algorithm runs using the original parameterisation but presents results for the transformed parameter (see report)
+
+```{r, message=F, warning=F,echo=TRUE, fig.align='center'}
+a=raymcmc(Coo, Sourc,Inftim,nits=100000)
+```
+The result corresponds to a matrix where each column corresponds to the sample from a model parameter. So the posterior distribution of the parameter $\alpha$, $\beta$ and $\gamma$ correspond to the first, second and third column respectively. We discarde the first 10000 iterations and produce the histogram representing the distribution of the each parameter using the popular **ggplot2** package.
+
+```{r, message=F, warning=F,echo=TRUE, fig.align='center'}
+b=data.frame(a[10000:100000,])
+colnames(b)=c("V1","V2","V3")
+library("ggplot2")
+q=qplot(1/sqrt(2*V1),data=b,geom='histogram',xlab=bquote(alpha~(km)),ylab='',xlim=c(50,150))
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+q=qplot(V2,data=b,geom='histogram',xlab=bquote(beta~(days^-1~km)),ylab='',xlim=c(0,.02))
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+q=qplot(V3,data=b,geom='histogram',xlab=bquote('Infectious period'~(days^-1)),ylab='')
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+
+```
+* **Exponential kernel**
+
+Here, we run the MCMC for 100000 iterations and specify the initials values for the models parameters.
+```{r, message=F, warning=F,echo=TRUE, fig.align='center'}
+a=expmcmc(Coo, Sourc,Inftim,nits=100000,theta=c(.1,.3,infper))
+b=data.frame(a[10000:100000,])
+colnames(b)=c("V1","V2","V3")
+q=qplot(1/V1,data=b,geom='histogram',xlab=bquote(alpha~(km)),ylab='',xlim=c(25,250))
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+q=qplot(V2,data=b,geom='histogram',xlab=bquote(beta~(days^-1~km)),ylab='',xlim=c(0,.02))
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+q=qplot(V3,data=b,geom='histogram',xlab=bquote('Infectious period'~(days^-1)),ylab='')
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+
+```
+
+* **Cauchy kernel**
+
+Similar to the previous case, we run the MCMC for 100000 iterations and specify the initials values for the models parameters.
+```{r, message=F, warning=F,echo=TRUE, fig.align='center'}
+a=caumcmc(Coo, Sourc,Inftim,nits=100000,theta=c(.1,.3,infper))
+b=data.frame(a[10000:100000,])
+colnames(b)=c("V1","V2","V3")
+q=qplot(V1,data=b,geom='histogram',xlab=bquote(alpha~(km)),ylab='',xlim=c(25,350))
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+q=qplot(V2,data=b,geom='histogram',xlab=bquote(beta~(days^-1~km)),ylab='',xlim=c(0,.02))
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+q=qplot(V3,data=b,geom='histogram',xlab=bquote('Infectious period'~(days^-1)),ylab='')
+q+ geom_histogram(aes(fill = ..count..)) +theme(legend.position="none")
+
+```
+
+## Posterior distribution of wave speed
+
+The speed of wave speed is estimated with the function **speed**. See **help(speed)** for the function description
+The following is the code to poduce the wave speed of propagation using the posterior distribution of the model parameters obtained from the above MCMC. We use the distribution of the parameters included in the package but it is straightforward to directly use the distributions generated by the MCMC. 
+
+We begin by loading the joint posterior parameter distribution into R, randomy drawing 1000 samples from such posteriors, choosing the final observaton time and fixing the frequency at which the system will be observed.
+
+```{r, message=F, warning=F,echo=TRUE}
+data(postray)  # Posterior distribution of the model parameters obtained from the MCMC
+samp=sample(10000:100000,1000)
+alpha=postray[,1][samp]
+beta=postray[,2][samp]
+Tmax=600  
+tim=10:Tmax
+gama=postray[,3][samp]
+
+```
+
+The following lines produce the wave speed of propagation using for the Rayleigh kernel.
+```{r, message=F, warning=F,echo=TRUE, fig.cap='95%-credible interval for wave speed from posterior predictive simulations of the process', fig.align='center', fig.width=6, fig.height=6}
+l=1
+speed=speed(alpha,beta,tim,gama,Tmax,samp,l)
+# plot speed with 95\% credible interval along with the median  
+hist(speed,breaks=50,col='blue',main=' ',xlab='Wave speed in any direction',xaxt='n')
+abline(v=round(median(speed),2),col='red',lwd=2)
+abline(v=round(quantile(speed,.025),2),col='red',lty=2)
+abline(v=round(quantile(speed,.975),2),col='red',lty=2)
+axis(side=1,at=c(round(quantile(speed,.025),2),round(median(speed),2),round(quantile(speed,.975),2)),las=2)
+box()
+
+
+```
+<script type="text/x-mathjax-config">
+   MathJax.Hub.Config({  "HTML-CSS": { minScaleAdjust: 125, availableFonts: [] }  });
+</script>
+# References

@@ -1,0 +1,26 @@
+Package: pprmcmc
+Type: Package
+Title: An implementation of MCMC for system with only infections locations known and wave speed of progation.
+Version: 0.1.0
+Author: Hola Kwame Adrakey, Gavin Gibson
+Maintainer: Hola Adrakey <ahk30@hw.ac.uk>
+Description: An implementation of the MCMC algorithm of system with unknow susceptbilbe loacatons.
+            This is an implementation of the Gibbs sampler within Metropolis-Hasting algorithm to
+            sample from the posterior distribution. In essence, it uses Gibbs steps to sample from
+            the contact rate and depending on the dispersal kernel it uses either Metropolis-Hasting
+            to sample from the posterior distribution of the dispersal kernel parameter. The change
+            in the transmission netwrok along with the infectious peirod is then done using M-H.
+            The package provide the posterior speed of wave propagation propagation.
+License: What license is it under?
+LazyData: TRUE
+LinkingTo: Rcpp, RcppArmadillo
+Imports:
+    Rcpp,
+    RcppArmadillo,
+    ggplot2,
+    VGAM
+RoxygenNote: 5.0.1
+Suggests: testthat,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
