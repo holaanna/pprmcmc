@@ -5,7 +5,7 @@ We begin by loading the package and then attaching the PPR data from Tunisia.  T
 ```{r, message=F, warning=F,echo=TRUE}
 library("pprmcmc")
 data(ppr)
-attach(ppr)
+attach(ppr) 
 #Premisses locations
 Coo=matrix(c(ppr$Longitude,ppr$Latitude),nrow=26,ncol=2,byrow=F)
 #Infection times
