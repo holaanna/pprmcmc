@@ -1,4 +1,4 @@
-#1 Instuctions
+# 1 Instuctions
 
 ## Installations
 The package is installable on any machine that supports R, as long as the following requirements are met:
@@ -39,7 +39,7 @@ The simplest approach for modifying this package would follow these steps:
 
 @WIC15 provides more details of how to build and update such a package. 
 
-#2 A User’s Guide
+# 2 A User’s Guide
 
 
 ## Tunisian Data and initials considerations
