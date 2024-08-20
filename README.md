@@ -1,4 +1,48 @@
-# Tunisian Data and initials considerations
+#1 Instuctions
+
+## Installations
+The package is installable on any machine that supports R, as long as the following requirements are met:
+
+1. Installation of R or Rstudio 
+
+2. Make sure you have Rtools installed. This could be obtained from CRAN by following the link
+https://cran.r-project.org/bin/windows/Rtools/
+
+3. Make sure the R and Rtools paths are added in the environment variable.
+                                                                                                               
+4. Checks if Rtools is installed by:
+      - Installing the R package **devtools**
+      - loading the package into R (**library(devtools)**)
+      - If the command **find_rtools()** results in **TRUE**, then it should be possible to proceed.
+      
+5. Installation of the dependent R packages Rcpp, RcppArmadillo, ggplot2 and VGAM (all available on CRAN)
+
+6. The two files to be installed are **pprmcmc_0.1.0.tar.gz** and. The command line **install.packages("path_to_file/pprmcmc_0.1.0.tar.gz", repos = NULL, type = "source",dependencies=TRUE)** where path_to_file would represent the full path will install the package.
+   
+After the installation the pacakges can be loaded into R/Rstudio using *library(pprmcmc)*. The command line **??pprmcmc** and **vignette("pprmcmc_vignettes")** would provide the package help pages and its documentation respectively. The most important functions are listed in the description page and could be accessed. The list of all functions and some headers could then be accessed by clicking on **Index** seen at the bottom line of the description page.
+
+The source codes (C++ code) are included in the folder **pprmcmc** at /src, the data at /data and any R code is included in /R. Note that the only routine written in R is the speed of propagation **speed.R**.
+All the functions (C++) are contained in one file, so any modification of a function regarding the MCMC will be made in **postsamp.cpp** respectively. Note that the examples included are those used to obtain the graphs (regarding PPR) in the main report.
+
+## Modification
+The simplest approach for modifying this package would follow these steps:
+
+1. Install the most recent Rstudio
+
+2. Install the packages **devtools, roxygen2, testthat, knitr** (all available on CRAN)
+
+3. Open the file **pprmcmc.Rproj** contained in the folder **pprmcmc**. 
+
+4. Go to **Tools>Project Options>Build Tools>Configure** and check **Build & Reload**
+
+5. After making the requiered modification click **Build & Reload** in the build panel to completely rebuild the package, including updating all the documentation, installs it in your own library.
+
+@WIC15 provides more details of how to build and update such a package. 
+
+#2 A User’s Guide
+
+
+## Tunisian Data and initials considerations
 We now explain how to use **pprmcmc** on the Tunisia data in @EFSA15 which consist of the times the locations of infected sites. We reflect our vague prior knowledge on the parameters $\alpha$ and $\beta$ by setting $a=c=10^{-4}$ and $ b=d=10^{-6}$ but we choose an informative prior belief for the infectious period by setting $e=0$ and $f=120$. This choice allows premises to remain infectious for a period up to four months as opposed to three months period considered in @EFSA15 since there is no evidence showing an external source of infection for the $4^{th}$ infection which occurred $108$ days after the third one. 
 
 We begin by loading the package and then attaching the PPR data from Tunisia.  Then we provide some initial values for the MCMC routine.
